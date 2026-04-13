@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="ru">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Управление пользователями</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+</head>
+
+<body class="bg-light">
+  <div class="container py-4">
+    <a href="/menu" class="fw-bold">Назад</a>
+    <h2 class="mb-4">Управление пользователями</h2>
+
+    <!-- Форма создания -->
+    <div class="card mb-4">
+      <div class="card-body">
+        <h5>Создать пользователя</h5>
+        <div class="row g-2">
+          <div class="col">
+            <input id="login" class="form-control" placeholder="Логин" required minlength="3" />
+          </div>
+          <div class="col">
+            <input id="password" type="password" class="form-control" placeholder="Пароль" required minlength="6" />
+          </div>
+          <div class="col">
+            <input id="fio" class="form-control" placeholder="ФИО" required minlength="3" />
+          </div>
+          <div class="col">
+            <select id="role" class="form-select" required>
+              <option value="">Выберите роль</option>
+              <option value="admin">Администратор</option>
+              <option value="teacher">Класс. рук.</option>
+              <option value="department">Зав. отделения</option>
+            </select>
+          </div>
+          <div class="col">
+            <button class="btn btn-primary w-100" onclick="createUser()">
+              Создать
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Таблица -->
+    <table class="table table-bordered table-striped">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Login</th>
+          <th>ФИО</th>
+          <th>Role</th>
+          <th>Действия</th>
+        </tr>
+      </thead>
+      <tbody id="usersTable"></tbody>
+    </table>
+  </div>
+
+  <script>
+    const API_URL = "http://localhost:3001";
+
+    function getToken() {
+      return localStorage.getItem("authToken");
+    }
+
+    async function fetchUsers() {
+      const res = await fetch(`${API_URL}/api/users`, {
+        headers: {
+          Authorization: `Bearer ${getToken()}`,
+        },
+      });
+
+      const data = await res.json();
+      renderUsers(data);
+    }
+
+    function validateInput(input, condition, message) {
+      input.classList.remove("is-invalid");
+
+      if (!condition) {
+        input.classList.add("is-invalid");
+
+        if (!input.nextElementSibling) {
+          const div = document.createElement("div");
+          div.className = "invalid-feedback";
+          div.innerText = message;
+          input.after(div);
+        } else {
+          input.nextElementSibling.innerText = message;
+        }
+
+        return false;
+      }
+
+      return true;
+    }
+
+    function renderUsers(users) {
+      const table = document.getElementById("usersTable");
+      table.innerHTML = "";
+
+      users.forEach((user) => {
+        const row = `
+<tr>
+    <td>${user.user_id}</td>
+    <td><input class="form-control" value="${user.login}" id="login-${user.user_id}"></td>
+    <td><input class="form-control" value="${user.fio}" id="fio-${user.user_id}"></td>
+    <td>
+        <select class="form-select" id="role-${user.user_id}">
+            <option value="admin" ${user.role === "admin" ? "selected" : ""}>Администратор</option>
+            <option value="teacher" ${user.role === "teacher" ? "selected" : ""}>Класс. рук.</option>
+            <option value="department" ${user.role === "department" ? "selected" : ""}>Зав. отделения</option>
+        </select>
+    </td>
+    <td>
+        <button class="btn btn-sm btn-success" onclick="updateUser(${user.user_id})">Сохранить</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteUser(${user.user_id})">Удалить</button>
+    </td>
+</tr>
+`;
+        table.innerHTML += row;
+      });
+    }
+
+    async function createUser() {
+      const loginInput = document.getElementById("login");
+      const passwordInput = document.getElementById("password");
+      const fioInput = document.getElementById("fio");
+      const roleInput = document.getElementById("role");
+
+      const login = loginInput.value.trim();
+      const password = passwordInput.value.trim();
+      const fio = fioInput.value.trim();
+      const role = roleInput.value.trim();
+
+      let isValid = true;
+
+      isValid &= validateInput(loginInput, login.length >= 3, "Минимум 3 символа");
+      isValid &= validateInput(passwordInput, password.length >= 6, "Минимум 6 символов");
+      isValid &= validateInput(fioInput, fio.length >= 3, "Введите ФИО");
+      isValid &= validateInput(roleInput, role !== "", "Выберите роль");
+
+      if (!isValid) return;
+
+      await fetch(`${API_URL}/api/users`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ login, password, fio, role }),
+      });
+
+      // очистка формы
+      loginInput.value = "";
+      passwordInput.value = "";
+      fioInput.value = "";
+      roleInput.value = "";
+
+      fetchUsers();
+    }
+
+    async function updateUser(id) {
+      const loginInput = document.getElementById(`login-${id}`);
+      const fioInput = document.getElementById(`fio-${id}`);
+      const roleInput = document.getElementById(`role-${id}`);
+
+      const login = loginInput.value.trim();
+      const fio = fioInput.value.trim();
+      const role = roleInput.value.trim();
+
+      let isValid = true;
+
+      isValid &= validateInput(loginInput, login.length >= 3, "Минимум 3 символа");
+      isValid &= validateInput(fioInput, fio.length >= 3, "Введите ФИО");
+      isValid &= validateInput(roleInput, role !== "", "Введите роль");
+
+      if (!isValid) return;
+
+      await fetch(`${API_URL}/api/users/${id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getToken()}`,
+        },
+        body: JSON.stringify({ login, fio, role }),
+      });
+
+      fetchUsers();
+    }
+
+    async function deleteUser(id) {
+      if (!confirm("Удалить пользователя?")) return;
+
+      await fetch(`${API_URL}/users/${id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${getToken()}`,
+        },
+      });
+
+      fetchUsers();
+    }
+
+    fetchUsers();
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Управление группами</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="bg-light">
+    <div class="container py-4">
+      <a href="/menu" class="fw-bold">Назад</a>
+      <h2 class="mb-4">Управление группами</h2>
+
+      <!-- Форма создания -->
+      <div class="card mb-4">
+        <div class="card-body">
+          <h5>Создать группу</h5>
+          <div class="row g-2">
+            <div class="col">
+              <input id="group_name" class="form-control" placeholder="Название группы" />
+            </div>
+            <div class="col">
+              <input id="department_id"
+       class="form-control"
+       placeholder="ID отделения"
+       inputmode="numeric"
+       oninput="this.value = this.value.replace(/[^0-9]/g, '')" />
+            </div>
+            <div class="col">
+              <input id="user_id"
+       class="form-control"
+       placeholder="ID преподавателя"
+       inputmode="numeric"
+       oninput="this.value = this.value.replace(/[^0-9]/g, '')" />
+            </div>
+            <div class="col">
+              <button class="btn btn-primary w-100" onclick="createGroup()">
+                Создать
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Таблица -->
+      <table class="table table-bordered table-striped">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Название</th>
+            <th>Department ID</th>
+            <th>Отделение</th>
+            <th>Teacher ID</th>
+            <th>Преподаватель</th>
+            <th>Действия</th>
+          </tr>
+        </thead>
+        <tbody id="groupsTable"></tbody>
+      </table>
+    </div>
+
+    <script>
+      const API_URL = "http://localhost:3001";
+
+      function getToken() {
+        return localStorage.getItem("authToken");
+      }
+
+      async function fetchGroups() {
+        const res = await fetch(`${API_URL}/api/groups`, {
+          headers: {
+            Authorization: `Bearer ${getToken()}`,
+          },
+        });
+
+        const data = await res.json();
+        renderGroups(data);
+      }
+      function isValidId(value) {
+  return /^[0-9]+$/.test(value);
+}
+
+      function renderGroups(groups) {
+        if (!Array.isArray(groups)) {
+          console.error('Ожидался массив, пришло:', groups);
+          alert(groups.error || 'Ошибка загрузки групп');
+          return;
+        }
+
+        const table = document.getElementById("groupsTable");
+        table.innerHTML = "";
+
+        groups.forEach((g) => {
+          const row = `
+            <tr>
+                <td>${g.group_id}</td>
+                <td><input class="form-control" value="${g.group_name}" id="name-${g.group_id}"></td>
+                <td><input class="form-control"
+         value="${g.department_id}"
+         id="dep-${g.group_id}"
+         oninput="this.value = this.value.replace(/[^0-9]/g, '')"></td>
+                <td>${g.department_name ?? '-'}</td>
+                <td><input class="form-control"
+         value="${g.user_id ?? ''}"
+         id="user-${g.group_id}"
+         oninput="this.value = this.value.replace(/[^0-9]/g, '')"></td>
+                <td>${g.teacher_fio ?? '-'} (${g.teacher_login ?? '-'})</td>
+                <td>
+                    <button class="btn btn-sm btn-success" onclick="updateGroup(${g.group_id})">Сохранить</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteGroup(${g.group_id})">Удалить</button>
+                    <a class="btn btn-sm btn-success" href="/admin/groups/${g.group_id}">Перейти</a>
+                </td>
+            </tr>
+          `;
+          table.innerHTML += row;
+        });
+      }
+
+      async function createGroup() {
+  const nameInput = document.getElementById("group_name");
+  const depInput = document.getElementById("department_id");
+  const userInput = document.getElementById("user_id");
+
+  const group_name = nameInput.value.trim();
+  const department_id = depInput.value.trim();
+  let user_id = userInput.value.trim();
+
+  nameInput.classList.remove("is-invalid");
+  depInput.classList.remove("is-invalid");
+  userInput.classList.remove("is-invalid");
+
+  let isValid = true;
+
+  if (group_name.length < 2) {
+    nameInput.classList.add("is-invalid");
+    isValid = false;
+  }
+
+  if (!isValidId(department_id)) {
+    depInput.classList.add("is-invalid");
+    isValid = false;
+  }
+
+  if (user_id !== "" && !isValidId(user_id)) {
+    userInput.classList.add("is-invalid");
+    isValid = false;
+  }
+
+  if (!isValid) return;
+
+  if (user_id === "") user_id = null;
+
+  await fetch(`${API_URL}/api/groups`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${getToken()}`,
+    },
+    body: JSON.stringify({ group_name, department_id, user_id }),
+  });
+
+  fetchGroups();
+}
+
+      async function updateGroup(id) {
+  const nameInput = document.getElementById(`name-${id}`);
+  const depInput = document.getElementById(`dep-${id}`);
+  const userInput = document.getElementById(`user-${id}`);
+
+  const group_name = nameInput.value.trim();
+  const department_id = depInput.value.trim();
+  let user_id = userInput.value.trim();
+
+  nameInput.classList.remove("is-invalid");
+  depInput.classList.remove("is-invalid");
+  userInput.classList.remove("is-invalid");
+
+  let isValid = true;
+
+  if (group_name.length < 2) {
+    nameInput.classList.add("is-invalid");
+    isValid = false;
+  }
+
+  if (!isValidId(department_id)) {
+    depInput.classList.add("is-invalid");
+    isValid = false;
+  }
+
+  if (user_id !== "" && !isValidId(user_id)) {
+    userInput.classList.add("is-invalid");
+    isValid = false;
+  }
+
+  if (!isValid) return;
+
+  if (user_id === "") user_id = null;
+
+  await fetch(`${API_URL}/api/groups/${id}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${getToken()}`,
+    },
+    body: JSON.stringify({ group_name, department_id, user_id }),
+  });
+
+  fetchGroups();
+}
+
+      async function deleteGroup(id) {
+        if (!confirm("Удалить группу?")) return;
+
+        const res = await fetch(`${API_URL}/api/groups/${id}`, {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${getToken()}`,
+          },
+        });
+
+        const data = await res.json();
+
+        if (data.error) {
+          alert(data.error);
+        }
+
+        fetchGroups();
+      }
+
+      fetchGroups();
+    </script>
+  </body>
+</html>

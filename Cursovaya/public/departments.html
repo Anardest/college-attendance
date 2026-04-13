@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Управление отделениями</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="bg-light">
+    <div class="container py-4">
+      <a href="/menu" class="fw-bold">Назад</a>
+      <h2 class="mb-4">Управление отделениями</h2>
+
+      <!-- Форма создания -->
+      <div class="card mb-4">
+        <div class="card-body">
+          <h5>Создать отделение</h5>
+          <div class="row g-2">
+            <div class="col">
+              <input
+                id="department_name"
+                class="form-control"
+                placeholder="Название отделения"
+                minlength="3"
+              />
+            </div>
+            <div class="col">
+              <input
+                id="user_id"
+                class="form-control"
+                placeholder="ID пользователя"
+                type="number"
+                pattern="[0-9]*"
+                oninput="this.value = this.value.replace(/[^0-9]/g, '')"
+              />
+            </div>
+            <div class="col">
+              <button
+                class="btn btn-primary w-100"
+                onclick="createDepartment()"
+              >
+                Создать
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Таблица -->
+      <table class="table table-bordered table-striped">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Название</th>
+            <th>User ID</th>
+            <th>Логин</th>
+            <th>ФИО</th>
+            <th>Действия</th>
+          </tr>
+        </thead>
+        <tbody id="departmentsTable"></tbody>
+      </table>
+    </div>
+
+    <script>
+      function isValidId(value) {
+        return /^[0-9]+$/.test(value);
+      }
+
+      const API_URL = "http://localhost:3001";
+
+      function getToken() {
+        return localStorage.getItem("authToken");
+      }
+
+      async function fetchDepartments() {
+        const res = await fetch(`${API_URL}/api/departments`, {
+          headers: {
+            Authorization: `Bearer ${getToken()}`,
+          },
+        });
+
+        const data = await res.json();
+        renderDepartments(data);
+      }
+
+      function renderDepartments(departments) {
+        if (!Array.isArray(departments)) {
+          console.error("Ожидался массив, пришло:", departments);
+          alert(departments.error || "Ошибка загрузки отделений");
+          return;
+        }
+
+        const table = document.getElementById("departmentsTable");
+        table.innerHTML = "";
+
+        departments.forEach((dep) => {
+          const row = `
+      <tr>
+          <td>${dep.department_id}</td>
+          <td><input class="form-control" value="${dep.department_name}" id="name-${dep.department_id}"></td>
+          <td><input class="form-control" value="${dep.user_id ?? ""}" id="user-${dep.department_id}" oninput="this.value = this.value.replace(/[^0-9]/g, '')"></td>
+          <td>${dep.login ?? "-"}</td>
+          <td>${dep.fio ?? "-"}</td>
+          <td>
+              <button class="btn btn-sm btn-success" onclick="updateDepartment(${dep.department_id})">Сохранить</button>
+              <button class="btn btn-sm btn-danger" onclick="deleteDepartment(${dep.department_id})">Удалить</button>
+          </td>
+      </tr>
+    `;
+          table.innerHTML += row;
+        });
+      }
+
+      async function createDepartment() {
+  const nameInput = document.getElementById("department_name");
+  const userInput = document.getElementById("user_id");
+
+  const department_name = nameInput.value.trim();
+  let user_id = userInput.value.trim();
+
+  // очистка ошибок
+  nameInput.classList.remove("is-invalid");
+  userInput.classList.remove("is-invalid");
+
+  let isValid = true;
+
+  if (department_name.length < 3) {
+    nameInput.classList.add("is-invalid");
+    isValid = false;
+  }
+
+  if (user_id !== "" && !isValidId(user_id)) {
+    userInput.classList.add("is-invalid");
+    isValid = false;
+  }
+
+  if (!isValid) return;
+
+  if (user_id === "") user_id = null;
+
+  await fetch(`${API_URL}/api/departments`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${getToken()}`,
+    },
+    body: JSON.stringify({ department_name, user_id }),
+  });
+
+  fetchDepartments();
+}
+
+      async function updateDepartment(id) {
+  const nameInput = document.getElementById(`name-${id}`);
+  const userInput = document.getElementById(`user-${id}`);
+
+  const department_name = nameInput.value.trim();
+  let user_id = userInput.value.trim();
+
+  nameInput.classList.remove("is-invalid");
+  userInput.classList.remove("is-invalid");
+
+  let isValid = true;
+
+  if (department_name.length < 3) {
+    nameInput.classList.add("is-invalid");
+    isValid = false;
+  }
+
+  if (user_id !== "" && !/^[0-9]+$/.test(user_id)) {
+    userInput.classList.add("is-invalid");
+    isValid = false;
+  }
+
+  if (!isValid) return;
+
+  if (user_id === "") user_id = null;
+
+  await fetch(`${API_URL}/api/departments/${id}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${getToken()}`,
+    },
+    body: JSON.stringify({ department_name, user_id }),
+  });
+
+  fetchDepartments();
+}
+
+      async function deleteDepartment(id) {
+        if (!confirm("Удалить отделение?")) return;
+
+        const res = await fetch(`${API_URL}/api/departments/${id}`, {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${getToken()}`,
+          },
+        });
+
+        const data = await res.json();
+
+        if (data.error) {
+          alert(data.error);
+        }
+
+        fetchDepartments();
+      }
+
+      fetchDepartments();
+    </script>
+  </body>
+</html>
